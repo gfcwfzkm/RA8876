@@ -628,6 +628,7 @@
  * 19.9 Serial Flash & SPI Master Control Register
  */
 #define RA8876_DMA_CTRL			0xB6	// Serial Flash DMA Controller REG
+#define RA8876_DMA_CTRL_START	0x01
 
 #define RA8876_SFL_CTRL			0xB7	// Serial Flash/ROM Controller Register
 #define RA8876_SFL_CTRL_SELECT	0x80	// Serial Flash/ROM I/F # Select
@@ -848,11 +849,11 @@
 #define RA8876_IICMCMDR_STOP	0x40	// STOP
 #define RA8876_IICMCMDR_READ	0x20	// READ
 #define RA8876_IICMCMDR_WRITE	0x10	// WRITE
-#define RA8876_IICMCMDR_ACK		0x08	// ACKNOWLEDGE
+#define RA8876_IICMCMDR_NACK	0x08	// NOT ACKNOWLEDGE
 #define RA8876_IICMCMDR_NOISEF	0x01	// Noise Filter
 
 #define RA8876_IICMSTUR			0xEA	// I2C Master Status Register
-#define RA8876_IICMSTUR_ACK_REC	0x80	// Received acknowledge from slave
+#define RA8876_IICMSTUR_NACK_REC	0x80	// Received acknowledge from slave
 #define RA8876_IICMSTUR_BUSY	0x40	// I2C Bus is Busy
 #define RA8876_IICMSTUR_TRANS	0x02	// Transfer in progress
 #define RA8876_IICMSTUR_LOST	0x01	// Abritration lost

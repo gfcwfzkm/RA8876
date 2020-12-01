@@ -1,7 +1,7 @@
 /*
  * RA8876.c
- * Version 0.1
- * Created: 17.11.2020
+ * Version 0.8
+ * Created: 12.11.2019 15:12:02
  *  Author: gfcwfzkm
  */ 
 
@@ -10,10 +10,9 @@
 #define EN_DELAY()	asm("nop");
 
 enum RA8876_dispMode _textMode;
-enum RA8876_TextSize _textSize;
-uint16_t _area_x0,_area_y0,_area_width,_area_height;
+enum RA8876_TextSize _textSize = TEXTSIZE_8x16_16x16;
 
-void _setup_PLL_initial()
+static void _setup_PLL_initial()
 {
 #if (SCAN_FREQ >= 63)
 	RA8876_writeReg(RA8876_PPLLC1,RA8876_PPLLC1_DIVK4_gc);    //PLL Divided by 4
@@ -69,7 +68,7 @@ void _setup_PLL_initial()
 	_delay_ms(1);
 }
 
-void _setup_SDRAM_initial()
+static void _setup_SDRAM_initial()
 {
 	uint16_t sdram_itv;
 
@@ -94,7 +93,7 @@ void _setup_SDRAM_initial()
 	_delay_ms(1);
 }
 
-void _setup_TFT_interface()
+static void _setup_TFT_interface()
 {
 	uint8_t reg_temp;
 	
@@ -104,7 +103,7 @@ void _setup_TFT_interface()
 	RA8876_writeReg(RA8876_CCR, reg_temp);
 }
 
-void _setup_disp_size(uint16_t x, uint16_t y)
+static void _setup_disp_size(uint16_t x, uint16_t y)
 {
 	uint16_t temp;
 	
@@ -118,7 +117,7 @@ void _setup_disp_size(uint16_t x, uint16_t y)
 	RA8876_writeReg(RA8876_VDHR1, temp);	
 }
 
-void _setup_non_disp_size_hor(uint16_t x)
+static void _setup_non_disp_size_hor(uint16_t x)
 {
 	uint8_t temp;
 	
@@ -128,7 +127,7 @@ void _setup_non_disp_size_hor(uint16_t x)
 	RA8876_writeReg(RA8876_HNDFTR, temp);
 }
 
-void _setup_HSYNC_startpos(uint16_t x)
+static void _setup_HSYNC_startpos(uint16_t x)
 {
 	uint8_t temp;
 	
@@ -136,7 +135,7 @@ void _setup_HSYNC_startpos(uint16_t x)
 	RA8876_writeReg(RA8876_HSTR, temp);
 }
 
-void _setup_HSYNC_pulse(uint16_t x)
+static void _setup_HSYNC_pulse(uint16_t x)
 {
 	uint8_t temp;
 	
@@ -144,7 +143,7 @@ void _setup_HSYNC_pulse(uint16_t x)
 	RA8876_writeReg(RA8876_HPWR, temp);
 }
 
-void _setup_non_disp_size_ver(uint16_t y)
+static void _setup_non_disp_size_ver(uint16_t y)
 {
 	uint8_t temp;
 	
@@ -154,7 +153,7 @@ void _setup_non_disp_size_ver(uint16_t y)
 	RA8876_writeReg(RA8876_VNDR1, temp);
 }
 
-void _setup_VSYNC_startpos(uint16_t y)
+static void _setup_VSYNC_startpos(uint16_t y)
 {
 	uint8_t temp;
 	
@@ -162,7 +161,7 @@ void _setup_VSYNC_startpos(uint16_t y)
 	RA8876_writeReg(RA8876_VSTR, temp);	
 }
 
-void _setup_VSYNC_pulse(uint16_t y)
+static void _setup_VSYNC_pulse(uint16_t y)
 {
 	uint8_t temp;	
 	
@@ -189,14 +188,7 @@ void RA8876_init()
 		
 	RA8876_DATA_DIR = DATA_OUT;
 	
-	RA8876_DATA_PORT.PIN0CTRL = PORT_OPC_PULLUP_gc;
-	RA8876_DATA_PORT.PIN1CTRL = PORT_OPC_PULLUP_gc;
-	RA8876_DATA_PORT.PIN2CTRL = PORT_OPC_PULLUP_gc;
-	RA8876_DATA_PORT.PIN3CTRL = PORT_OPC_PULLUP_gc;
-	RA8876_DATA_PORT.PIN4CTRL = PORT_OPC_PULLUP_gc;
-	RA8876_DATA_PORT.PIN5CTRL = PORT_OPC_PULLUP_gc;
-	RA8876_DATA_PORT.PIN6CTRL = PORT_OPC_PULLUP_gc;
-	RA8876_DATA_PORT.PIN7CTRL = PORT_OPC_PULLUP_gc;
+	DATA_PULLRESISTOR_ENABLE(RA8876_DATA_PORT);
 #elif INTERFACE_SPI
 	DIROUT(RA8876_CS_PORT, RA8876_CS_PIN);
 	SETBIT(RA8876_CS_PORT, RA8876_CS_PIN);
@@ -204,7 +196,7 @@ void RA8876_init()
 #endif
 	uint8_t reg_temp;
 	
-	/* ï¿½berprï¿½fen, ob das Display vollstï¿½ndig aufgestartet ist */
+	// Überprüfen, ob das Display vollständig aufgestartet ist
 	while(RA8876_readStatus() & RA8876_OPERATION_MODE);
 	
 	RA8876_swReset();	
@@ -268,6 +260,7 @@ void RA8876_init()
 #endif
 }
 
+//-------------- LOW LEVEL --------------------------------------------------------------
 
 void RA8876_writeCMD(uint8_t _cmd)
 {
@@ -277,7 +270,7 @@ void RA8876_writeCMD(uint8_t _cmd)
 	CLRBIT(RA8876_CS_PORT, RA8876_CS);
 	RA8876_DATA_OUT = _cmd;
 	SETBIT(RA8876_EN_PORT, RA8876_EN);
-	EN_DELAY();
+	//EN_DELAY();
 	CLRBIT(RA8876_EN_PORT, RA8876_EN);
 	SETBIT(RA8876_CS_PORT, RA8876_CS);
 #elif INTERFACE_SPI
@@ -295,16 +288,13 @@ void RA8876_writeData(uint8_t data)
 {
 #if INTERFACE_PARALLEL_8BIT
 	CLRBIT(RA8876_CS_PORT, RA8876_CS);
-	EN_DELAY();
-	while (TSTBIT(RA8876_WAIT_PORT, RA8876_WAIT) == 0)
-	{
-		EN_DELAY();
-	}
+	//EN_DELAY();
+	while (TSTBIT(RA8876_WAIT_PORT, RA8876_WAIT) == 0);
 	SETBIT(RA8876_RS_PORT, RA8876_RS);
 	CLRBIT(RA8876_RW_PORT, RA8876_RW);
 	RA8876_DATA_OUT = data;
 	SETBIT(RA8876_EN_PORT, RA8876_EN);
-	EN_DELAY();
+	//EN_DELAY();
 	CLRBIT(RA8876_EN_PORT, RA8876_EN);
 	SETBIT(RA8876_CS_PORT, RA8876_CS);
 #elif INTERFACE_SPI	
@@ -328,7 +318,7 @@ uint8_t RA8876_readData()
 	SETBIT(RA8876_RS_PORT, RA8876_RS);
 	CLRBIT(RA8876_CS_PORT, RA8876_CS);
 	SETBIT(RA8876_EN_PORT, RA8876_EN);
-	EN_DELAY();
+	//EN_DELAY();
 	temp = RA8876_DATA_IN;
 	CLRBIT(RA8876_EN_PORT, RA8876_EN);
 	SETBIT(RA8876_CS_PORT, RA8876_CS);
@@ -355,7 +345,7 @@ enum RA8876_status RA8876_readStatus(void)
 	CLRBIT(RA8876_RS_PORT, RA8876_RS);
 	CLRBIT(RA8876_CS_PORT, RA8876_CS);
 	SETBIT(RA8876_EN_PORT, RA8876_EN);
-	EN_DELAY();
+	//EN_DELAY();
 	_status = RA8876_DATA_IN;
 	CLRBIT(RA8876_EN_PORT, RA8876_EN);
 	SETBIT(RA8876_CS_PORT, RA8876_CS);
@@ -372,15 +362,19 @@ enum RA8876_status RA8876_readStatus(void)
 	return _status;
 }
 
+//-------------- HARDWARE ---------------------------------------------------------------
+
 void RA8876_writeReg(uint8_t _reg, uint8_t _val)
 {
-	//_delay_ms(1);
+/*
+// Old stuff from RA8875 days
 #if INTERFACE_SPI
 	for(uint8_t i = 40; i > 0; i--)
 	{
 		EN_DELAY();
 	}
 #endif
+*/
 	RA8876_writeCMD(_reg);
 	RA8876_writeData(_val);
 }
@@ -488,6 +482,8 @@ void RA8876_brightness(uint8_t val)
 	RA8876_writeReg(RA8876_PCFGR, reg_temp);
 }
 
+//-------------- DISPLAY / CANVAS / AREA ------------------------------------------------
+
 void RA8876_MainWindowStartAddress(enum RA8876_memoryStartAddress _addr)
 {	
 	RA8876_writeReg(RA8876_MISA0,_addr);
@@ -524,33 +520,8 @@ void RA8876_CanvasWidth(uint16_t width)
 	RA8876_writeReg(RA8876_CVS_IMWTH1,width>>8);
 }
 
-uint16_t RA8876_getActiveAreaX(void)
-{
-	return _area_x0;
-}
-
-uint16_t RA8876_getActiveAreaY(void)
-{
-	return _area_y0;
-}
-
-uint16_t RA8876_getActiveAreaWidth(void)
-{
-	return _area_width;
-}
-
-uint16_t RA8876_getActiveAreaHeight(void)
-{
-	return _area_height;
-}
-
 void RA8876_setActiveArea(uint16_t x0, uint16_t y0, uint16_t width, uint16_t height)
-{
-	_area_x0 = x0;
-	_area_y0 = y0;
-	_area_width = width;
-	_area_height = height;
-	
+{	
 	// Set Active Window XY
 	RA8876_writeReg(RA8876_AWUL_X0, x0);
 	RA8876_writeReg(RA8876_AWUL_X1, x0 >> 8);
@@ -562,6 +533,111 @@ void RA8876_setActiveArea(uint16_t x0, uint16_t y0, uint16_t width, uint16_t hei
 	RA8876_writeReg(RA8876_AW_HT0, height);
 	RA8876_writeReg(RA8876_AW_HT1, height>>8);
 }
+
+void RA8876_pipSelect(enum RA8876_PIP_Select _pip_sel, enum RA8876_PIP_ColorDepth _clr)
+{
+	uint8_t reg_temp_color, reg_temp_select;
+	
+	reg_temp_color = RA8876_readReg(RA8876_PIPCDEP);
+	reg_temp_select = RA8876_readReg(RA8876_MPWCTR);
+	
+	if (_pip_sel)
+	{
+		// PIP1
+		reg_temp_select &=~ RA8876_MPWCTR_PIP_SEL;
+		reg_temp_color &=~ RA8876_PIPCDEP_PIP1_COLR_DPTH_MASK;
+		reg_temp_color |= (_clr << 2);
+	}
+	else
+	{
+		// PIP2
+		reg_temp_select |= RA8876_MPWCTR_PIP_SEL;
+		reg_temp_color &=~ RA8876_PIPCDEP_PIP2_COLR_DPTH_MASK;
+		reg_temp_color |= _clr;
+	}
+	
+	RA8876_writeReg(RA8876_MPWCTR, reg_temp_select);
+	RA8876_writeReg(RA8876_PIPCDEP, reg_temp_color);	
+}
+
+void RA8876_pipImageStartAddress(uint32_t _addr)
+{
+	RA8876_writeReg(RA8876_PISA0,_addr);
+	RA8876_writeReg(RA8876_PISA1,_addr>>8);
+	RA8876_writeReg(RA8876_PISA2,_addr>>16);
+	RA8876_writeReg(RA8876_PISA3,_addr>>24);
+}
+
+void RA8876_pipImageCoords(uint16_t x0, uint16_t y0)
+{
+	RA8876_writeReg(RA8876_PWIULX0, x0);
+	RA8876_writeReg(RA8876_PWIULX1, x0 >> 8);
+	RA8876_writeReg(RA8876_PWIULY0, y0);
+	RA8876_writeReg(RA8876_PWIULY1, y0 >> 8);
+}
+
+void RA8876_pipImageWidth(uint16_t width)
+{
+	RA8876_writeReg(RA8876_PIW0, width);
+	RA8876_writeReg(RA8876_PIW1, width >> 8);
+}
+
+void RA8876_pipWindowCoords(uint16_t x0, uint16_t y0)
+{
+	RA8876_writeReg(RA8876_PWDULX0, x0);
+	RA8876_writeReg(RA8876_PWDULX1, x0 >> 8);
+	RA8876_writeReg(RA8876_PWDULY0, y0);
+	RA8876_writeReg(RA8876_PWDULY1, y0 >> 8);
+}
+
+void RA8876_pipWindowSize(uint16_t width, uint8_t height)
+{
+	RA8876_writeReg(RA8876_PWW0, width);
+	RA8876_writeReg(RA8876_PWW1, width >> 8);
+	RA8876_writeReg(RA8876_PWH0, height);
+	RA8876_writeReg(RA8876_PWH1, height >> 8);
+}
+
+void RA8876_pipEnable(enum RA8876_PIP_Select _pip_sel)
+{
+	uint8_t reg_temp;
+	reg_temp = RA8876_readReg(RA8876_MPWCTR);
+	
+	if (_pip_sel)
+	{
+		// PIP1
+		reg_temp |= RA8876_MPWCTR_PIP1_EN;
+	}
+	else
+	{
+		// PIP2
+		reg_temp |= RA8876_MPWCTR_PIP2_EN;
+	}
+	
+	RA8876_writeReg(RA8876_MPWCTR, reg_temp);
+}
+
+void RA8876_pipDisable(enum RA8876_PIP_Select _pip_sel)
+{
+	uint8_t reg_temp;
+	reg_temp = RA8876_readReg(RA8876_MPWCTR);
+	
+	if (_pip_sel)
+	{
+		// PIP1
+		reg_temp &=~ RA8876_MPWCTR_PIP1_EN;
+	}
+	else
+	{
+		// PIP2
+		reg_temp &=~ RA8876_MPWCTR_PIP2_EN;		
+	}
+	
+	RA8876_writeReg(RA8876_MPWCTR, reg_temp);
+}
+
+
+//-------------- COLORS -----------------------------------------------------------------
 
 void RA8876_setFColorRGB(uint8_t red, uint8_t green, uint8_t blue)
 {
@@ -613,7 +689,9 @@ void RA8876_setColor(uint16_t fgColor, uint16_t bgColor, uint16_t Transparent)
 	RA8876_transparentOnOff(Transparent);
 }
 
-void RA8876_cursorBlink(uint8_t _blinkRate, enum RA8876_cursor cursorType)
+//-------------- TEXT -------------------------------------------------------------------
+
+void RA8876_textCursorBlink(uint8_t _blinkRate, enum RA8876_cursor cursorType)
 {
 	uint8_t reg_temp, cW=0, cH=0;
 	
@@ -640,6 +718,7 @@ void RA8876_cursorBlink(uint8_t _blinkRate, enum RA8876_cursor cursorType)
 				break;
 			}
 			reg_temp |= RA8876_GTCCR_TXT_CURSOR_EN;
+			reg_temp &=~ RA8876_GTCCR_GRAPH_CURSOR_EN;
 			break;
 		case CURSOR_UNDER:
 			switch (_textSize)
@@ -658,6 +737,7 @@ void RA8876_cursorBlink(uint8_t _blinkRate, enum RA8876_cursor cursorType)
 				break;
 			}
 			reg_temp |= RA8876_GTCCR_TXT_CURSOR_EN;
+			reg_temp &=~ RA8876_GTCCR_GRAPH_CURSOR_EN;
 			break;
 		case CURSOR_BLOCK:
 			switch (_textSize)
@@ -676,13 +756,14 @@ void RA8876_cursorBlink(uint8_t _blinkRate, enum RA8876_cursor cursorType)
 					break;
 			}
 			reg_temp |= RA8876_GTCCR_TXT_CURSOR_EN;
+			reg_temp &=~ RA8876_GTCCR_GRAPH_CURSOR_EN;
 			break;
 		case CURSOR_NOCURSOR:
 		default:
 			break;
 	}
 	
-	if (_blinkRate)	reg_temp |= RA8876_GTCCR_TXT_CURSOR_BLINK_EN;
+	if (_blinkRate)		reg_temp |= RA8876_GTCCR_TXT_CURSOR_BLINK_EN;
 	
 	RA8876_writeReg(RA8876_GTCCR, reg_temp);
 	RA8876_writeReg(RA8876_BTCR, _blinkRate);
@@ -699,7 +780,7 @@ void RA8876_setTextSizeEnlargement(uint8_t mul_width, uint8_t mul_height)
 	RA8876_writeReg(RA8876_CCR1,temp);
 }
 
-void RA8876_setTextXY(uint16_t x0, uint16_t y0)
+void RA8876_setTextCoords(uint16_t x0, uint16_t y0)
 {
 	RA8876_writeReg(RA8876_F_CURX0, x0);
 	RA8876_writeReg(RA8876_F_CURX1, x0 >> 8);
@@ -734,14 +815,100 @@ void RA8876_FontGTFontROM(void)
 	RA8876_writeReg(RA8876_CCR0,reg_temp);
 }
 
-void RA8876_SelectGTFontChip(enum RA8876_GT_Font_ROM _gt_rom)
+void RA8876_selectGTFontChip(enum RA8876_GT_Font_ROM _gt_rom)
 {
 	RA8876_writeReg(RA8876_GTFNT_SEL, _gt_rom);
 }
 
-void RA8876_SetGTFontDecoder(enum RA8876_GT_Character_Set _chr, enum RA8876_GT_Character_Width _wdh)
+void RA8876_setGTFontDecoder(enum RA8876_GT_Character_Set _chr, enum RA8876_GT_Character_Width _wdh)
 {
 	RA8876_writeReg(RA8876_GTFNT_CR, _chr | _wdh);
+}
+
+void RA8876_graphicCursorEnable(void)
+{
+	uint8_t reg_temp;
+	
+	reg_temp = RA8876_readReg(RA8876_GTCCR);
+	reg_temp &=~ RA8876_GTCCR_TXT_CURSOR_EN;
+	reg_temp |= RA8876_GTCCR_GRAPH_CURSOR_EN;
+	RA8876_writeReg(RA8876_GTCCR, reg_temp);
+}
+
+void RA8876_graphicCursorDisable(void)
+{
+	uint8_t reg_temp;
+	
+	reg_temp = RA8876_readReg(RA8876_GTCCR);
+	reg_temp &=~ RA8876_GTCCR_GRAPH_CURSOR_EN;
+	RA8876_writeReg(RA8876_GTCCR, reg_temp);
+}
+
+void RA8876_graphicCursorColor(uint8_t gcc0, uint8_t gcc1)
+{
+	//Graphic Cursor supports four colors, two of them being 8bpp programmable colors.
+	RA8876_writeReg(RA8876_GCC0, gcc0);
+	RA8876_writeReg(RA8876_GCC1, gcc1);
+}
+
+void RA8876_graphicCursorSelect(uint8_t _cursor_sel)
+{
+	uint8_t reg_temp = RA8876_readReg(RA8876_GTCCR);
+	reg_temp &= ~(RA8876_GTCCR_GRAPH_CURSOR_SEL_MASK);
+	reg_temp |= (_cursor_sel << 2) & RA8876_GTCCR_GRAPH_CURSOR_SEL_MASK;
+	RA8876_writeReg(RA8876_GTCCR, reg_temp);
+}
+
+void RA8876_graphicCursorLoad(const uint8_t *gcursor)
+{
+	uint8_t byteCounter = 0xFF;
+	
+	if (_textMode)	RA8876_setMode(GRAPHMODE);
+	
+	RA8876_Memory_Select(dest_GC_RAM);
+	
+	RA8876_writeCMD(RA8876_MRWDP);
+	
+	do{
+		RA8876_writeData(*gcursor++);
+	}while(byteCounter--);
+	
+	RA8876_Memory_Select(dest_SDRAM);
+}
+
+void RA8876_graphicCursorLoad_f(const __memx uint8_t *gcursor)
+{
+	uint8_t byteCounter = 0xFF;
+	
+	if (_textMode)	RA8876_setMode(GRAPHMODE);
+	
+	RA8876_Memory_Select(dest_GC_RAM);
+	
+	RA8876_writeCMD(RA8876_MRWDP);
+	
+	do{
+		RA8876_writeData(*gcursor++);
+	}while(byteCounter--);
+	
+	RA8876_Memory_Select(dest_SDRAM);
+}
+
+void RA8876_graphicCursorCoords(uint16_t x0, uint16_t y0)
+{
+	RA8876_writeReg(RA8876_GCHP0, x0);
+	RA8876_writeReg(RA8876_GCHP1, x0 >> 8);
+	RA8876_writeReg(RA8876_GCVP0, y0);
+	RA8876_writeReg(RA8876_GCVP1, y0 >> 8);
+}
+
+void RA8876_setLineGap(uint8_t _linetoline_gap)
+{
+	RA8876_writeReg(RA8876_FLDR, _linetoline_gap);
+}
+
+void RA8876_setCharGap(uint8_t _chartochar_gap)
+{
+	RA8876_writeReg(RA8876_F2FSSR, _chartochar_gap);
 }
 
 void RA8876_printText(const char *text, uint16_t textLength)
@@ -777,7 +944,7 @@ void RA8876_print(char *text)
 	while (!(RA8876_readStatus() & RA8876_MEMW_FIFO_EMPTY));
 }
 
-void RA8876_print_p(const char *progmem_s)
+void RA8876_print_f(const __memx char *progmem_s)
 {
 	char character;
 	
@@ -785,7 +952,7 @@ void RA8876_print_p(const char *progmem_s)
 	
 	RA8876_writeCMD(RA8876_MRWDP);
 	
-	while( (character = pgm_read_byte(progmem_s++)) )
+	while( (character = *progmem_s++) )	// Print until null-character
 	{
 		RA8876_writeData(character);
 		while (RA8876_readStatus() & RA8876_MEMW_FIFO_FULL);
@@ -793,7 +960,9 @@ void RA8876_print_p(const char *progmem_s)
 	while (!(RA8876_readStatus() & RA8876_MEMW_FIFO_EMPTY));
 }
 
-void RA8876_setPixelPos(uint16_t x0, uint16_t y0)
+//-------------- Grafik -----------------------------------------------------------------
+
+void RA8876_setPixelCoords(uint16_t x0, uint16_t y0)
 {
 	RA8876_writeReg(RA8876_CURH0, x0);
 	RA8876_writeReg(RA8876_CURH1, x0 >> 8);
@@ -804,13 +973,13 @@ void RA8876_setPixelPos(uint16_t x0, uint16_t y0)
 void RA8876_drawPixel(uint16_t x0, uint16_t y0, uint16_t color)
 {
 	if (_textMode)	RA8876_setMode(GRAPHMODE);
-	RA8876_setPixelPos(x0,y0);
+	RA8876_setPixelCoords(x0,y0);
 	RA8876_writeCMD(RA8876_MRWDP);
 	RA8876_writeData(color);
 	RA8876_writeData(color >> 8);
 }
 
-void _RA8876_Triangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color, uint16_t filled)
+static void _RA8876_Triangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color, uint16_t filled)
 {
 	if (_textMode)	RA8876_setMode(GRAPHMODE);
 	
@@ -849,7 +1018,7 @@ void _RA8876_Triangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16
 	while(RA8876_readStatus() & RA8876_CORE_BUSY);
 }
 
-void _RA8876_Rect(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t r_w, uint16_t r_h, uint16_t color, uint8_t filled, uint8_t rect_type)
+static void _RA8876_Rect(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t r_w, uint16_t r_h, uint16_t color, uint8_t filled, uint8_t rect_type)
 {
 	if (_textMode)	RA8876_setMode(GRAPHMODE);
 	
@@ -899,7 +1068,7 @@ void _RA8876_Rect(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t r
 	while(RA8876_readStatus() & RA8876_CORE_BUSY);
 }
 
-void _RA8876_Curve(uint16_t x0, uint16_t y0, uint16_t r_w, uint16_t r_h, enum RA8876_selectCurve _curve, uint16_t color, uint8_t filled, uint8_t _curve_type)
+static void _RA8876_Curve(uint16_t x0, uint16_t y0, uint16_t r_w, uint16_t r_h, enum RA8876_selectCurve _curve, uint16_t color, uint8_t filled, uint8_t _curve_type)
 {
 	if (_textMode)	RA8876_setMode(GRAPHMODE);
 	
@@ -1026,7 +1195,7 @@ void RA8876_BTE_S0_Coords(uint16_t x0, uint16_t y0)
 void RA8876_BTE_S0_Width(uint16_t width)
 {
 	RA8876_writeReg(RA8876_S0_WTH0,width);
-	RA8876_writeReg(RA8876_S0_WTH0,width>>8);
+	RA8876_writeReg(RA8876_S0_WTH1,width>>8);
 }
 
 void RA8876_BTE_S1_Address(uint32_t _addr)
@@ -1048,7 +1217,7 @@ void RA8876_BTE_S1_Coords(uint16_t x0, uint16_t y0)
 void RA8876_BTE_S1_Width(uint16_t width)
 {
 	RA8876_writeReg(RA8876_S1_WTH0,width);
-	RA8876_writeReg(RA8876_S1_WTH0,width>>8);
+	RA8876_writeReg(RA8876_S1_WTH1,width>>8);
 }
 
 void RA8876_BTE_S1_ConstColor64k(uint16_t color)
@@ -1063,6 +1232,51 @@ void RA8876_BTE_S1_ConstColorRGB(uint8_t red, uint8_t green, uint8_t blue)
 	RA8876_writeReg(RA8876_S1_RED, red);
 	RA8876_writeReg(RA8876_S1_GREEN, green);
 	RA8876_writeReg(RA8876_S1_BLUE, blue);
+}
+
+void RA8876_BTE_Dest_Address(uint32_t _addr)
+{
+	RA8876_writeReg(RA8876_DT_STR0,_addr);
+	RA8876_writeReg(RA8876_DT_STR1,_addr>>8);
+	RA8876_writeReg(RA8876_DT_STR2,_addr>>16);
+	RA8876_writeReg(RA8876_DT_STR3,_addr>>24);
+}
+
+void RA8876_BTE_Dest_Coords(uint16_t x0, uint16_t y0)
+{
+	RA8876_writeReg(RA8876_DT_X0,x0);
+	RA8876_writeReg(RA8876_DT_X1,x0>>8);
+	RA8876_writeReg(RA8876_DT_Y0,y0);
+	RA8876_writeReg(RA8876_DT_Y1,y0>>8);
+}
+
+void RA8876_BTE_Dest_Width(uint16_t width)
+{
+	RA8876_writeReg(RA8876_DT_WTH0,width);
+	RA8876_writeReg(RA8876_DT_WTH1,width>>8);
+}
+
+void RA8876_BTE_WindowSize(uint16_t width, uint16_t height)
+{
+	RA8876_writeReg(RA8876_BTE_WTH0,width);
+	RA8876_writeReg(RA8876_BTE_WTH1,width>>8);
+	RA8876_writeReg(RA8876_BTE_HIG0,height);
+	RA8876_writeReg(RA8876_BTE_HIG1,height>>8);
+}
+
+void RA8876_BTE_AlphaBlending(uint8_t _opaque)
+{
+	RA8876_writeReg(RA8876_APB_CTRL, _opaque);
+}
+
+void RA8876_BTE_enable(void)
+{
+	RA8876_writeReg(RA8876_BTE_CTRL0, RA8876_BTE_CTRL0_STAT);
+}
+
+void RA8876_BTE_disable(void)
+{
+	RA8876_writeReg(RA8876_BTE_CTRL0, 0);
 }
 
 //-------------- Serial Flash / SPI-Master ----------------------------------------------
@@ -1084,17 +1298,22 @@ void _RA8876_accessMode(uint8_t _mode)
 
 void RA8876_spi_selectFlash(uint8_t _0_or_1)
 {
-	uint8_t reg_temp;
-	reg_temp = RA8876_readReg(RA8876_SFL_CTRL);
+	uint8_t reg_temp0;
+	uint8_t reg_temp1;
+	reg_temp0 = RA8876_readReg(RA8876_SFL_CTRL);
+	reg_temp1 = RA8876_readReg(RA8876_SPIMCR2);
 	if (_0_or_1)
 	{
-		reg_temp |= RA8876_SFL_CTRL_SELECT;
+		reg_temp0 |= RA8876_SFL_CTRL_SELECT;
+		reg_temp1 |= RA8876_SPIMCR2_SS_PIN;
 	}
 	else
 	{
-		reg_temp &= ~RA8876_SFL_CTRL_SELECT;
+		reg_temp0 &= ~RA8876_SFL_CTRL_SELECT;
+		reg_temp1 &= ~RA8876_SPIMCR2_SS_PIN;
 	}
-	RA8876_writeReg(RA8876_SFL_CTRL, reg_temp);
+	RA8876_writeReg(RA8876_SFL_CTRL, reg_temp0);
+	RA8876_writeReg(RA8876_SPIMCR2, reg_temp1);
 }
 
 void RA8876_spi_DMA_mode(void)
@@ -1144,4 +1363,221 @@ void RA8876_spi_disable(void)
 	reg_temp = RA8876_readReg(RA8876_CCR);
 	reg_temp &= ~RA8876_CCR_SPI_ENABLE;
 	RA8876_writeReg(RA8876_CCR, reg_temp);
+}
+
+void RA8876_spi_DMA_start(void)
+{
+	RA8876_writeReg(RA8876_DMA_CTRL, RA8876_DMA_CTRL_START);
+}
+
+uint8_t RA8876_spi_DMA_busy(void)
+{
+	return RA8876_readReg(RA8876_DMA_CTRL);
+}
+
+void RA8876_spi_mode(enum RA8876_SPI_MODE _mode)
+{
+	uint8_t reg_temp;
+	reg_temp = RA8876_readReg(RA8876_SPIMCR2);
+	reg_temp &= ~RA8876_SPIMCR2_SPI_MODE_MASK;
+	reg_temp |= _mode;
+	RA8876_writeReg(RA8876_SPIMCR2, reg_temp);
+}
+
+enum RA8876_SPI_STATUS RA8876_spi_getStatus()
+{
+	return RA8876_readReg(RA8876_SPIMSR);
+}
+
+void RA8876_spi_slaveActive(void)
+{
+	uint8_t reg_temp;
+	reg_temp = RA8876_readReg(RA8876_SPIMCR2);
+	reg_temp |= RA8876_SPIMCR2_SS_ACT;
+	RA8876_writeReg(RA8876_SPIMCR2, reg_temp);
+}
+
+void RA8876_spi_slaveInactive(void)
+{
+	uint8_t reg_temp;
+	reg_temp = RA8876_readReg(RA8876_SPIMCR2);
+	reg_temp &=~ RA8876_SPIMCR2_SS_ACT;
+	RA8876_writeReg(RA8876_SPIMCR2, reg_temp);
+}
+
+void RA8876_spi_send(uint8_t data)
+{
+	/* Puts data on the 16-entries deep Tx FIFO
+	 * Check the SPI Status regarding Tx FIFO full / empty */
+	RA8876_writeReg(RA8876_SPIDR, data);
+}
+
+uint8_t RA8876_spi_get()
+{
+	/* Reads data from the 16-entries deep Rx FIFO
+	 * Check the SPI Status regarding Rx FIFO full / empty */
+	return RA8876_readReg(RA8876_SPIDR);
+}
+void RA8876_spi_DMA_flashAddress(uint32_t _addr)
+{
+	RA8876_writeReg(RA8876_DMA_SSTR0, _addr);
+	RA8876_writeReg(RA8876_DMA_SSTR1, _addr >> 8);
+	RA8876_writeReg(RA8876_DMA_SSTR2, _addr >> 16);
+	RA8876_writeReg(RA8876_DMA_SSTR3, _addr >> 24);
+}
+
+void RA8876_spi_DMA_Dest_Coords(uint16_t x0, uint16_t y0)
+{
+	RA8876_writeReg(RA8876_DMA_DX0, x0);
+	RA8876_writeReg(RA8876_DMA_DX1, x0 >> 8);
+	RA8876_writeReg(RA8876_DMA_DY0, y0);
+	RA8876_writeReg(RA8876_DMA_DY1, y0 >> 8);
+}
+
+void RA8876_spi_DMA_WindowSize(uint16_t width, uint16_t height)
+{
+	RA8876_writeReg(RA8876_DMAW_WTH0, width);
+	RA8876_writeReg(RA8876_DMAW_WTH1, width >> 8);
+	RA8876_writeReg(RA8876_DMAW_HIGH0, height);
+	RA8876_writeReg(RA8876_DMAW_HIGH1, height >> 8);
+}
+
+void RA8876_spi_DMA_SrcWidth(uint16_t width)
+{
+	RA8876_writeReg(RA8876_DMA_SWTH0, width);
+	RA8876_writeReg(RA8876_DMA_SWTH1, width >> 8);
+}
+
+//-------------- I2C-Master -------------------------------------------------------------
+
+void RA8876_i2c_clockDiv(uint16_t _clkdiv)
+{
+	RA8876_writeReg(RA8876_IICMCPR0, _clkdiv);
+	RA8876_writeReg(RA8876_IICMCPR0, _clkdiv >> 8);
+}
+
+void RA8876_i2c_send(uint8_t data)
+{
+	RA8876_writeReg(RA8876_IICMTXR, data); 
+}
+
+uint8_t RA8876_i2c_get(void)
+{
+	return RA8876_readReg(RA8876_IICMRXR);
+}
+
+void RA8876_i2c_mode(enum RA8876_I2C_MODE _mode)
+{
+	RA8876_writeReg(RA8876_IICMCMDR, _mode);
+}
+
+enum RA8876_I2C_STATUS RA8876_i2c_status(void)
+{
+	return RA8876_readReg(RA8876_IICMSTUR);
+}
+
+//-------------- GPIO -------------------------------------------------------------------
+
+void RA8876_gpio_setdir(enum RA8876_GPIO_PORT _port, uint8_t direction)
+{
+	switch (_port)
+	{
+		case GPIOA:
+			RA8876_writeReg(RA8876_GPIOAD, direction);
+			break;
+		case GPIOC:
+			RA8876_writeReg(RA8876_GPIOCD, direction);
+			break;
+		case GPIOD:
+			RA8876_writeReg(RA8876_GPIODD, direction);
+			break;
+		case GPIOE:
+			RA8876_writeReg(RA8876_GPIOED, direction);
+			break;
+		case GPIOF:
+			RA8876_writeReg(RA8876_GPIOFD, direction);
+			break;
+		default:
+			break;
+	}
+}
+
+uint8_t RA8876_gpio_getdir(enum RA8876_GPIO_PORT _port)
+{
+	uint8_t reg_temp = 0;
+	
+	switch (_port)
+	{
+		case GPIOA:
+			reg_temp = RA8876_readReg(RA8876_GPIOAD);
+			break;
+		case GPIOC:
+			reg_temp = RA8876_readReg(RA8876_GPIOCD);
+			break;
+		case GPIOD:
+			reg_temp = RA8876_readReg(RA8876_GPIODD);
+			break;
+		case GPIOE:
+			reg_temp = RA8876_readReg(RA8876_GPIOED);
+			break;
+		case GPIOF:
+			reg_temp = RA8876_readReg(RA8876_GPIOFD);
+			break;
+		default:
+			break;
+	}
+	
+	return reg_temp;
+}
+
+void RA8876_gpio_write(enum RA8876_GPIO_PORT _port, uint8_t data)
+{
+	switch (_port)
+	{
+		case GPIOA:
+			RA8876_writeReg(RA8876_GPIOA, data);
+			break;
+		case GPIOC:
+			RA8876_writeReg(RA8876_GPIOC, data);
+			break;
+		case GPIOD:
+			RA8876_writeReg(RA8876_GPIOD, data);
+			break;
+		case GPIOE:
+			RA8876_writeReg(RA8876_GPIOE, data);
+			break;
+		case GPIOF:
+			RA8876_writeReg(RA8876_GPIOF, data);
+			break;
+		default:
+			break;
+	}
+}
+
+uint8_t RA8876_gpio_read(enum RA8876_GPIO_PORT _port)
+{
+	uint8_t reg_temp = 0;
+	
+	switch (_port)
+	{
+		case GPIOA:
+			reg_temp = RA8876_readReg(RA8876_GPIOA);
+			break;
+		case GPIOC:
+			reg_temp = RA8876_readReg(RA8876_GPIOC);
+			break;
+		case GPIOD:
+			reg_temp = RA8876_readReg(RA8876_GPIOD);
+			break;
+		case GPIOE:
+			reg_temp = RA8876_readReg(RA8876_GPIOE);
+			break;
+		case GPIOF:
+			reg_temp = RA8876_readReg(RA8876_GPIOF);
+			break;
+		default:
+			break;
+	}
+	
+	return reg_temp;
 }
