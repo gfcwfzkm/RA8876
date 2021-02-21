@@ -1,8 +1,10 @@
 /*
  * RA8876.h
  * RA8876 (Low-Level) Library for Atmel (Microchip) AVR Micros (old / new generation, xmega)
- * Probably easy to port to other platforms
- * Uses 16-bit color by default
+ * Probably easy to port to other platforms, only a few specific functions make use of 
+ * delay during initialization.
+ * Uses 16-bit color by default.
+ * GT30L32S4W Font Chip on SS 0, 128Mbit Flash on SS 1
  * Version 0.8
  * - Mostly feature-complete
  * Created: 17.11.2020
@@ -14,8 +16,11 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
-#include "io_map.h"
+#include <inttypes.h>
 #include "RA8876_reg.h"
+
+#include "../io_map.h"
+
 
 /* USER CONFIG FROM HERE */
 // Select either 8bit parallel or SPI Interface
@@ -42,7 +47,7 @@
 
 #if INTERFACE_PARALLEL_8BIT
 #define RA8876_CS			LCD_CS
-#define RA8876_CS_PORT		MISCPORT
+#define RA8876_CS_PORT		MIXPORT
 #define	RA8876_EN			DB_EN		// RD
 #define RA8876_EN_PORT		SERPORT
 #define RA8876_RW			DB_RW
@@ -81,16 +86,18 @@
 /* USER CONFIG ENDS HERe */
 
 
-/* FSTR(s) - Stores a string directly into AVR's flash memory.
+/* XSTR(s) - Stores a string directly into AVR's flash memory.
  * 
  * Replacement for PSTR to get rid of the old pgmspace.h functions, and use the
  * more modern __flash / __memx equivalent.
  * Pretty much copied from PSTR's define and adapted to __memx.                   */
-#define FSTR(s) (__extension__({static __memx const char __c[] = (s); &__c[0];}))
+#ifndef XSTR
+	#define XSTR(s) (__extension__({static __memx const char __c[] = (s); &__c[0];}))
+#endif
 
 /* Display Setup Parameters - Do not change! Requires Code Adjustmets!
  * Display Code currently only set up to BuyDisplay's 10.1" RA8876 Display!*/
-#define W9812G6JH	// 128Mbits Memory (134'217'728 Bits)
+#define W9812G6JH	// 128Mbits SDRAM Memory (134'217'728 Bits)
 #define OSC_FREQ     10	  // crystal clcok
 #define DRAM_FREQ    100  // SDRAM clock frequency, unti: MHz
 #define CORE_FREQ    100  // Core (system) clock frequency, unit: MHz
@@ -99,8 +106,11 @@
 
 #define RA8876_WIDTH		1024UL
 #define RA8876_HEIGHT		600UL
-#define RA8876_COLORBYTES	2		// Library is set up for 16-bit / 2-byte colors!
+#define RA8876_COLORBYTES	2		// Library is set up for 16-bit / 2-byte colors Don't change!
 #define RA8876_CALC_LAYERADDR(x)	(x * RA8876_WIDTH * RA8876_HEIGHT * RA8876_COLORBYTES)
+#define RA8876_CALC_CUSTONADDR(__SCROLLHEIGHT,__OFFSET)	\
+							(__SCROLLHEIGHT * RA8876_WIDTH * RA8876_COLORBYTES + __OFFSET)
+#define RA8876_MAX_LAYER_ADDRESS	RA8876_CALC_LAYERADDR(100)
 
 enum RA8876_status {
 	RA8876_INT_PIN_STATE	= 0x01,
@@ -115,7 +125,8 @@ enum RA8876_status {
 
 /* Enum for the Canvas & Main Start Address of the Display.
  * With the memory installed on the buyDisplay Display, up to
- * 109 Layers at 16-bit colors are possible! So I only made Enum's for 10
+ * 109 Layers at 16-bit colors are possible with 128MB SDRAM!
+ * So I only made Enum's for 10
  */
 enum RA8876_memoryStartAddress {
 	LAYER_0	= RA8876_CALC_LAYERADDR(0),
@@ -137,6 +148,7 @@ enum RA8876_dispMode {
 
 enum RA8876_selectMem {
 	dest_SDRAM=0,
+	dest_GAMMA=RA8876_ICR_MEM_GAMMA_TABLE_gc,
 	dest_GC_RAM=RA8876_ICR_MEM_GC_RAM_gc,
 	dest_CP_RAM=RA8876_ICR_MEM_CP_RAM_gc
 };
@@ -187,27 +199,27 @@ enum RA8876_GT_Character_Set {
 	SINGLE_BYTE_ISO8859_1	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_0,
 	SINGLE_BYTE_ISO8859_2	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_1,
 	SINGLE_BYTE_ISO8859_3	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_1 |
-			RA8876_GTFNT_CR_CHAR_0,
+							RA8876_GTFNT_CR_CHAR_0,
 	SINGLE_BYTE_ISO8859_4	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_2,
 	SINGLE_BYTE_ISO8859_5	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_2 | 
-			RA8876_GTFNT_CR_CHAR_0,
+							RA8876_GTFNT_CR_CHAR_0,
 	SINGLE_BYTE_ISO8859_7	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_2 |
-			RA8876_GTFNT_CR_CHAR_1,
+							RA8876_GTFNT_CR_CHAR_1,
 	SINGLE_BYTE_ISO8859_8	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_2 | 
-			RA8876_GTFNT_CR_CHAR_1 | RA8876_GTFNT_CR_CHAR_0,
+							RA8876_GTFNT_CR_CHAR_1 | RA8876_GTFNT_CR_CHAR_0,
 	SINGLE_BYTE_ISO8859_9	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_3,
 	SINGLE_BYTE_ISO8859_10	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_3 | 
-			RA8876_GTFNT_CR_CHAR_0,
+							RA8876_GTFNT_CR_CHAR_0,
 	SINGLE_BYTE_ISO8859_11	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_3 | 
-			RA8876_GTFNT_CR_CHAR_1,
+							RA8876_GTFNT_CR_CHAR_1,
 	SINGLE_BYTE_ISO8859_13	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_3 | 
-			RA8876_GTFNT_CR_CHAR_1 | RA8876_GTFNT_CR_CHAR_0,
+							RA8876_GTFNT_CR_CHAR_1 | RA8876_GTFNT_CR_CHAR_0,
 	SINGLE_BYTE_ISO8859_14	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_3 | 
-			RA8876_GTFNT_CR_CHAR_2,
+							RA8876_GTFNT_CR_CHAR_2,
 	SINGLE_BYTE_ISO8859_15	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_3 | 
-			RA8876_GTFNT_CR_CHAR_2 | RA8876_GTFNT_CR_CHAR_0,
+							RA8876_GTFNT_CR_CHAR_2 | RA8876_GTFNT_CR_CHAR_0,
 	SINGLE_BYTE_ISO8859_16	= RA8876_GTFNT_CR_CHAR_4 | RA8876_GTFNT_CR_CHAR_3 | 
-			RA8876_GTFNT_CR_CHAR_2 | RA8876_GTFNT_CR_CHAR_1,
+							RA8876_GTFNT_CR_CHAR_2 | RA8876_GTFNT_CR_CHAR_1,
 	DOUBLE_BYTE_GB2312		= 0,
 	DOUBLE_BYTE_GB12345		= RA8876_GTFNT_CR_CHAR_0,
 	DOUBLE_BYTE_BIG5		= RA8876_GTFNT_CR_CHAR_1,
@@ -215,7 +227,7 @@ enum RA8876_GT_Character_Set {
 	DOUBLE_BYTE_UNIJAPANESE	= RA8876_GTFNT_CR_CHAR_2 | RA8876_GTFNT_CR_CHAR_0,
 	DOUBLE_BYTE_JIS0208		= RA8876_GTFNT_CR_CHAR_2 | RA8876_GTFNT_CR_CHAR_1,
 	DOUBLE_BYTE_MISC		= RA8876_GTFNT_CR_CHAR_2 | RA8876_GTFNT_CR_CHAR_1 | 
-			RA8876_GTFNT_CR_CHAR_0
+							RA8876_GTFNT_CR_CHAR_0
 };
 
 enum RA8876_GT_Character_Width {
@@ -260,17 +272,17 @@ enum RA8876_BTE_Operation {
 	BTE_MEM_COPY_MOVE_w_CHROMA		= RA8876_BTE_CTRL1_CODE_2 | RA8876_BTE_CTRL1_CODE_0,
 	BTE_PATTER_FILL_w_ROP			= RA8876_BTE_CTRL1_CODE_2 | RA8876_BTE_CTRL1_CODE_1,
 	BTE_PATTER_FILL_w_CHROMA		= RA8876_BTE_CTRL1_CODE_2 | RA8876_BTE_CTRL1_CODE_1 |
-			RA8876_BTE_CTRL1_CODE_0,
+									RA8876_BTE_CTRL1_CODE_0,
 	BTE_MPU_WRITE_w_COLOREXP		= RA8876_BTE_CTRL1_CODE_3,
 	BTE_MPU_WRITE_w_COLOREXP_CHROMA	= RA8876_BTE_CTRL1_CODE_3 | RA8876_BTE_CTRL1_CODE_0,
 	BTE_MEM_COPY_w_OPACITY			= RA8876_BTE_CTRL1_CODE_3 | RA8876_BTE_CTRL1_CODE_1,
 	BTE_MPU_WRITE_w_OPACITY			= RA8876_BTE_CTRL1_CODE_3 | RA8876_BTE_CTRL1_CODE_1 | 
-			RA8876_BTE_CTRL1_CODE_0,
+									RA8876_BTE_CTRL1_CODE_0,
 	BTE_SOLID_FILL					= RA8876_BTE_CTRL1_CODE_3 | RA8876_BTE_CTRL1_CODE_2,
 	BTE_MEM_COPY_w_COLOREXP			= RA8876_BTE_CTRL1_CODE_3 | RA8876_BTE_CTRL1_CODE_2 | 
-			RA8876_BTE_CTRL1_CODE_1,
+									RA8876_BTE_CTRL1_CODE_1,
 	BTE_MEM_COPY_w_COLOREXP_CHROMA	= RA8876_BTE_CTRL1_CODE_3 | RA8876_BTE_CTRL1_CODE_2 | 
-			RA8876_BTE_CTRL1_CODE_1 | RA8876_BTE_CTRL1_CODE_0
+									RA8876_BTE_CTRL1_CODE_1 | RA8876_BTE_CTRL1_CODE_0
 };
 
 enum RA8876_ROP_Operation {
@@ -282,19 +294,19 @@ enum RA8876_ROP_Operation {
 	ROP_NOT_S1						= RA8876_BTE_CTRL1_ROP_2 | RA8876_BTE_CTRL1_ROP_0,
 	ROP_S0_XOR_S1					= RA8876_BTE_CTRL1_ROP_2 | RA8876_BTE_CTRL1_ROP_1,
 	ROP_NOTS0_OR_NOTS1				= RA8876_BTE_CTRL1_ROP_2 | RA8876_BTE_CTRL1_ROP_1 | 
-			RA8876_BTE_CTRL1_ROP_0,
+									RA8876_BTE_CTRL1_ROP_0,
 	ROP_S0_AND_S1					= RA8876_BTE_CTRL1_ROP_3,
 	ROP_NOT_S0XORS1					= RA8876_BTE_CTRL1_ROP_3 | RA8876_BTE_CTRL1_ROP_0,
 	ROP_S1							= RA8876_BTE_CTRL1_ROP_3 | RA8876_BTE_CTRL1_ROP_1,
 	ROP_NOTS0_OR_S1					= RA8876_BTE_CTRL1_ROP_3 | RA8876_BTE_CTRL1_ROP_1 | 
-			RA8876_BTE_CTRL1_ROP_0,
+									RA8876_BTE_CTRL1_ROP_0,
 	ROP_S0							= RA8876_BTE_CTRL1_ROP_3 | RA8876_BTE_CTRL1_ROP_2,
 	ROP_S0_OR_NOTS1					= RA8876_BTE_CTRL1_ROP_3 | RA8876_BTE_CTRL1_ROP_2 | 
-			RA8876_BTE_CTRL1_ROP_0,
+									RA8876_BTE_CTRL1_ROP_0,
 	ROP_S0_OR_S1					= RA8876_BTE_CTRL1_ROP_3 | RA8876_BTE_CTRL1_ROP_2 | 
-			RA8876_BTE_CTRL1_ROP_1,
+									RA8876_BTE_CTRL1_ROP_1,
 	ROP_ROP_WHITENESS				= RA8876_BTE_CTRL1_ROP_3 | RA8876_BTE_CTRL1_ROP_2 | 
-			RA8876_BTE_CTRL1_ROP_1 | RA8876_BTE_CTRL1_ROP_0
+									RA8876_BTE_CTRL1_ROP_1 | RA8876_BTE_CTRL1_ROP_0
 };
 
 enum RA8876_SPI_STATUS {
@@ -324,7 +336,7 @@ enum RA8876_FlashReadMode {
 	NORMAL_TWO_DUMMY_READ	= RA8876_SFL_CTRL_BEHAVIOR_3,
 	DUALMODE_TWO_DUMMY_READ	= RA8876_SFL_CTRL_BEHAVIOR_1,
 	DUALMODE_ONE_DUMMY_READ = RA8876_SFL_CTRL_BEHAVIOR_1 |
-			RA8876_SFL_CTRL_BEHAVIOR_0
+							RA8876_SFL_CTRL_BEHAVIOR_0
 };
 
 enum RA8876_I2C_MODE {
@@ -344,13 +356,17 @@ enum RA8876_I2C_STATUS {
 };
 
 enum RA8876_GPIO_PORT {
-	GPIOA = 1,
-	GPIOC = 2,
-	GPIOD = 3,
-	GPIOE = 4,
-	GPIOF = 5
+	RAGPIOA = 1,
+	RAGPIOC = 2,
+	RAGPIOD = 3,
+	RAGPIOE = 4,
+	RAGPIOF = 5
 };
 
+
+typedef struct{
+	uint8_t slaveSel;	// 0 or 1	
+}RA8876_SPI_t;
 //-------------- Initialisierung --------------------------------------------------------
 void RA8876_init();	// Display und die I/Os initialisieren
 //-------------- LOW LEVEL --------------------------------------------------------------
@@ -371,10 +387,10 @@ void RA8876_Memory_Select(enum RA8876_selectMem _selectedMemory);
 void RA8876_clearMemory(uint16_t fbg);
 void RA8876_brightness(uint8_t val);
 //-------------- DISPLAY / CANVAS / AREA ------------------------------------------------
-void RA8876_MainWindowStartAddress(enum RA8876_memoryStartAddress _addr);
+void RA8876_MainWindowStartAddress(enum RA8876_memoryStartAddress _addr); // Display stuff
 void RA8876_MainWindowWidth(uint16_t width);
 void RA8876_MainWindowStartXY(uint16_t x0, uint16_t y0);
-void RA8876_CanvasStartAddr(enum RA8876_memoryStartAddress _addr);
+void RA8876_CanvasStartAddr(enum RA8876_memoryStartAddress _addr);	// Draw stuff
 void RA8876_CanvasWidth(uint16_t width);
 void RA8876_setActiveArea(uint16_t x0, uint16_t y0, uint16_t width, uint16_t height);
 void RA8876_pipSelect(enum RA8876_PIP_Select _pip_sel, enum RA8876_PIP_ColorDepth _clr);
@@ -415,7 +431,7 @@ void RA8876_printText(const char *text, uint16_t textLength);
 void RA8876_char(char c);
 void RA8876_print(char *text);
 void RA8876_print_f(const __memx char *progmem_s);
-#define RA8876_print_PROGMEM(__s)	RA8876_print_f(FSTR(__s))
+#define RA8876_print_PROGMEM(__s)	RA8876_print_f(XSTR(__s))
 //-------------- Grafik -----------------------------------------------------------------
 void RA8876_setPixelCoords(uint16_t x0, uint16_t y0);	// X und Y Position setzten
 void RA8876_drawPixel(uint16_t x0, uint16_t y0, uint16_t color);
@@ -476,11 +492,21 @@ enum RA8876_SPI_STATUS RA8876_spi_getStatus();
 void RA8876_spi_slaveActive(void);
 void RA8876_spi_slaveInactive(void);
 void RA8876_spi_send(uint8_t data);
+uint8_t RA8876_spi_transfer(uint8_t data);
 uint8_t RA8876_spi_get(void);
 void RA8876_spi_DMA_flashAddress(uint32_t _addr);
 void RA8876_spi_DMA_DestCoords(uint16_t x0, uint16_t y0);
 void RA8876_spi_DMA_WindowSize(uint16_t width, uint16_t height);
 void RA8876_spi_DMA_SrcWidth(uint16_t width);
+// - SPI DRIVER INTERFACE FUNCTION FOR EXTERNAL LIBRARIES -
+uint8_t RA8876_spi_InterfacePrepare(void *RASPI);
+uint8_t RA8876_spi_InterfaceSendBytes(void *RASPI, uint8_t addr,
+									const uint8_t *buf_ptr, uint32_t buf_len);
+uint8_t RA8876_spi_InterfaceTransceiveBytes(void *RASPI, uint8_t addr,
+									uint8_t *buf_ptr, uint32_t buf_len);
+uint8_t RA8876_spi_InterfaceGetBytes(void *RASPI, uint8_t addr,
+									uint8_t *buf_ptr, uint32_t buf_len);
+uint8_t RA8876_spi_InterfaceFinish(void *RASPI);
 //-------------- I2C-Master -------------------------------------------------------------
 void RA8876_i2c_clockDiv(uint16_t _clkdiv);
 void RA8876_i2c_send(uint8_t data);

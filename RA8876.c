@@ -1,13 +1,14 @@
 /*
  * RA8876.c
- * Version 0.8
- * Created: 12.11.2019 15:12:02
+ * Version 1.0
+ * Created: 17.11.2020 
  *  Author: gfcwfzkm
  */ 
 
 #include "RA8876.h"
 
-#define EN_DELAY()	asm("nop");
+#define EN_DELAY()	asm("nop"	"\n\t" \
+						"nop"	"\n\t");
 
 enum RA8876_dispMode _textMode;
 enum RA8876_TextSize _textSize = TEXTSIZE_8x16_16x16;
@@ -268,9 +269,10 @@ void RA8876_writeCMD(uint8_t _cmd)
 	CLRBIT(RA8876_RS_PORT, RA8876_RS);
 	CLRBIT(RA8876_RW_PORT, RA8876_RW);
 	CLRBIT(RA8876_CS_PORT, RA8876_CS);
+	EN_DELAY();
 	RA8876_DATA_OUT = _cmd;
 	SETBIT(RA8876_EN_PORT, RA8876_EN);
-	//EN_DELAY();
+	EN_DELAY();
 	CLRBIT(RA8876_EN_PORT, RA8876_EN);
 	SETBIT(RA8876_CS_PORT, RA8876_CS);
 #elif INTERFACE_SPI
@@ -288,13 +290,13 @@ void RA8876_writeData(uint8_t data)
 {
 #if INTERFACE_PARALLEL_8BIT
 	CLRBIT(RA8876_CS_PORT, RA8876_CS);
-	//EN_DELAY();
+	EN_DELAY();
 	while (TSTBIT(RA8876_WAIT_PORT, RA8876_WAIT) == 0);
 	SETBIT(RA8876_RS_PORT, RA8876_RS);
 	CLRBIT(RA8876_RW_PORT, RA8876_RW);
 	RA8876_DATA_OUT = data;
 	SETBIT(RA8876_EN_PORT, RA8876_EN);
-	//EN_DELAY();
+	EN_DELAY();
 	CLRBIT(RA8876_EN_PORT, RA8876_EN);
 	SETBIT(RA8876_CS_PORT, RA8876_CS);
 #elif INTERFACE_SPI	
@@ -317,8 +319,9 @@ uint8_t RA8876_readData()
 	SETBIT(RA8876_RW_PORT, RA8876_RW);
 	SETBIT(RA8876_RS_PORT, RA8876_RS);
 	CLRBIT(RA8876_CS_PORT, RA8876_CS);
+	EN_DELAY();
 	SETBIT(RA8876_EN_PORT, RA8876_EN);
-	//EN_DELAY();
+	EN_DELAY();
 	temp = RA8876_DATA_IN;
 	CLRBIT(RA8876_EN_PORT, RA8876_EN);
 	SETBIT(RA8876_CS_PORT, RA8876_CS);
@@ -344,8 +347,9 @@ enum RA8876_status RA8876_readStatus(void)
 	SETBIT(RA8876_RW_PORT, RA8876_RW);
 	CLRBIT(RA8876_RS_PORT, RA8876_RS);
 	CLRBIT(RA8876_CS_PORT, RA8876_CS);
+	EN_DELAY();
 	SETBIT(RA8876_EN_PORT, RA8876_EN);
-	//EN_DELAY();
+	EN_DELAY();
 	_status = RA8876_DATA_IN;
 	CLRBIT(RA8876_EN_PORT, RA8876_EN);
 	SETBIT(RA8876_CS_PORT, RA8876_CS);
@@ -854,8 +858,10 @@ void RA8876_graphicCursorColor(uint8_t gcc0, uint8_t gcc1)
 void RA8876_graphicCursorSelect(uint8_t _cursor_sel)
 {
 	uint8_t reg_temp = RA8876_readReg(RA8876_GTCCR);
-	reg_temp &= ~(RA8876_GTCCR_GRAPH_CURSOR_SEL_MASK);
-	reg_temp |= (_cursor_sel << 2) & RA8876_GTCCR_GRAPH_CURSOR_SEL_MASK;
+	
+	reg_temp &= ~RA8876_GTCCR_GRAPH_CURSOR_SEL_MASK;
+	reg_temp |= _cursor_sel << 2;
+	
 	RA8876_writeReg(RA8876_GTCCR, reg_temp);
 }
 
@@ -866,7 +872,6 @@ void RA8876_graphicCursorLoad(const uint8_t *gcursor)
 	if (_textMode)	RA8876_setMode(GRAPHMODE);
 	
 	RA8876_Memory_Select(dest_GC_RAM);
-	
 	RA8876_writeCMD(RA8876_MRWDP);
 	
 	do{
@@ -883,7 +888,6 @@ void RA8876_graphicCursorLoad_f(const __memx uint8_t *gcursor)
 	if (_textMode)	RA8876_setMode(GRAPHMODE);
 	
 	RA8876_Memory_Select(dest_GC_RAM);
-	
 	RA8876_writeCMD(RA8876_MRWDP);
 	
 	do{
@@ -1412,6 +1416,19 @@ void RA8876_spi_send(uint8_t data)
 	RA8876_writeReg(RA8876_SPIDR, data);
 }
 
+uint8_t RA8876_spi_transfer(uint8_t data)
+{
+	uint8_t readedData;
+	RA8876_writeReg(RA8876_SPIDR, data);
+	
+	// Wait until data has been send, thus a byte has been received
+	while((RA8876_spi_getStatus() & SPI_TxFIFO_EMPTY) == 0);
+	
+	readedData = RA8876_readReg(RA8876_SPIDR);
+	
+	return readedData;
+}
+
 uint8_t RA8876_spi_get()
 {
 	/* Reads data from the 16-entries deep Rx FIFO
@@ -1448,6 +1465,66 @@ void RA8876_spi_DMA_SrcWidth(uint16_t width)
 	RA8876_writeReg(RA8876_DMA_SWTH1, width >> 8);
 }
 
+// - SPI DRIVER INTERFACE FUNCTION FOR EXTERNAL LIBRARIES -
+uint8_t RA8876_spi_InterfacePrepare(void *RASPI)
+{
+	RA8876_SPI_t *_spi = (RA8876_SPI_t*)RASPI;
+	RA8876_spi_selectFlash(_spi->slaveSel);
+	RA8876_spi_slaveActive();
+	return 0;
+}
+
+uint8_t RA8876_spi_InterfaceSendBytes(void *RASPI, uint8_t addr,
+					const uint8_t *buf_ptr,	uint32_t buf_len)
+{
+	uint32_t byteCnt;
+	
+	if (addr != 0)	RA8876_spi_send(addr);
+	
+	for(byteCnt = 0; byteCnt < buf_len; byteCnt++)
+	{
+		RA8876_spi_send(buf_ptr[byteCnt]);
+	}
+	
+	return 0;
+}
+
+uint8_t RA8876_spi_InterfaceTransceiveBytes(void *RASPI, uint8_t addr,
+						uint8_t *buf_ptr, uint32_t buf_len)
+{
+	uint32_t byteCnt;
+	
+	if (addr != 0)	RA8876_spi_send(addr);
+	
+	for(byteCnt = 0; byteCnt < buf_len; byteCnt++)
+	{
+		buf_ptr[byteCnt] = RA8876_spi_transfer(buf_ptr[byteCnt]);
+	}
+	
+	return 0;
+}
+
+uint8_t RA8876_spi_InterfaceGetBytes(void *RASPI, uint8_t addr,
+						uint8_t *buf_ptr, uint32_t buf_len)
+{
+	uint32_t byteCnt;
+	
+	if (addr != 0)	RA8876_spi_send(addr);
+	
+	for(byteCnt = 0; byteCnt < buf_len; byteCnt++)
+	{
+		buf_ptr[byteCnt] = RA8876_spi_get();
+	}
+	
+	return 0;
+}
+
+uint8_t RA8876_spi_InterfaceFinish(void *RASPI)
+{
+	RA8876_spi_slaveInactive();
+	return 0;
+}
+
 //-------------- I2C-Master -------------------------------------------------------------
 
 void RA8876_i2c_clockDiv(uint16_t _clkdiv)
@@ -1482,19 +1559,19 @@ void RA8876_gpio_setdir(enum RA8876_GPIO_PORT _port, uint8_t direction)
 {
 	switch (_port)
 	{
-		case GPIOA:
+		case RAGPIOA:
 			RA8876_writeReg(RA8876_GPIOAD, direction);
 			break;
-		case GPIOC:
+		case RAGPIOC:
 			RA8876_writeReg(RA8876_GPIOCD, direction);
 			break;
-		case GPIOD:
+		case RAGPIOD:
 			RA8876_writeReg(RA8876_GPIODD, direction);
 			break;
-		case GPIOE:
+		case RAGPIOE:
 			RA8876_writeReg(RA8876_GPIOED, direction);
 			break;
-		case GPIOF:
+		case RAGPIOF:
 			RA8876_writeReg(RA8876_GPIOFD, direction);
 			break;
 		default:
@@ -1508,19 +1585,19 @@ uint8_t RA8876_gpio_getdir(enum RA8876_GPIO_PORT _port)
 	
 	switch (_port)
 	{
-		case GPIOA:
+		case RAGPIOA:
 			reg_temp = RA8876_readReg(RA8876_GPIOAD);
 			break;
-		case GPIOC:
+		case RAGPIOC:
 			reg_temp = RA8876_readReg(RA8876_GPIOCD);
 			break;
-		case GPIOD:
+		case RAGPIOD:
 			reg_temp = RA8876_readReg(RA8876_GPIODD);
 			break;
-		case GPIOE:
+		case RAGPIOE:
 			reg_temp = RA8876_readReg(RA8876_GPIOED);
 			break;
-		case GPIOF:
+		case RAGPIOF:
 			reg_temp = RA8876_readReg(RA8876_GPIOFD);
 			break;
 		default:
@@ -1534,19 +1611,19 @@ void RA8876_gpio_write(enum RA8876_GPIO_PORT _port, uint8_t data)
 {
 	switch (_port)
 	{
-		case GPIOA:
+		case RAGPIOA:
 			RA8876_writeReg(RA8876_GPIOA, data);
 			break;
-		case GPIOC:
+		case RAGPIOC:
 			RA8876_writeReg(RA8876_GPIOC, data);
 			break;
-		case GPIOD:
+		case RAGPIOD:
 			RA8876_writeReg(RA8876_GPIOD, data);
 			break;
-		case GPIOE:
+		case RAGPIOE:
 			RA8876_writeReg(RA8876_GPIOE, data);
 			break;
-		case GPIOF:
+		case RAGPIOF:
 			RA8876_writeReg(RA8876_GPIOF, data);
 			break;
 		default:
@@ -1560,19 +1637,19 @@ uint8_t RA8876_gpio_read(enum RA8876_GPIO_PORT _port)
 	
 	switch (_port)
 	{
-		case GPIOA:
+		case RAGPIOA:
 			reg_temp = RA8876_readReg(RA8876_GPIOA);
 			break;
-		case GPIOC:
+		case RAGPIOC:
 			reg_temp = RA8876_readReg(RA8876_GPIOC);
 			break;
-		case GPIOD:
+		case RAGPIOD:
 			reg_temp = RA8876_readReg(RA8876_GPIOD);
 			break;
-		case GPIOE:
+		case RAGPIOE:
 			reg_temp = RA8876_readReg(RA8876_GPIOE);
 			break;
-		case GPIOF:
+		case RAGPIOF:
 			reg_temp = RA8876_readReg(RA8876_GPIOF);
 			break;
 		default:
