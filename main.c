@@ -5,6 +5,7 @@
  * Author : gfcwfzkm
  */
 
+#ifdef DEMO_EXAMPLE
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <util/delay.h>
@@ -403,3 +404,4 @@ int main(void)
 		RA8876_graphicCursorCoords(xcur, ycur);
     }
 }
+#endif

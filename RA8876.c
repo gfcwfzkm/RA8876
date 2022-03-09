@@ -1,8 +1,8 @@
 /*
  * RA8876.c
  * Version 1.0
- * Created: 17.11.2020 
- *  Author: gfcwfzkm
+ * Created: 12.11.2019 15:12:02
+ *  Author: Pascal Gesell
  */ 
 
 #include "RA8876.h"
@@ -1339,7 +1339,7 @@ void RA8876_spi_FlashAddressMode(enum RA8876_FlashAddressBits _bits)
 	RA8876_writeReg(RA8876_SFL_CTRL, reg_temp);
 }
 
-void RA8876_spi_FlashReadMode(enum RA8876_FlashReadMode _reads)
+void RA8876_spi_FlashDummyRead(enum RA8876_FlashReadMode _reads)
 {
 	uint8_t reg_temp;
 	reg_temp = RA8876_readReg(RA8876_SFL_CTRL);
@@ -1475,24 +1475,24 @@ uint8_t RA8876_spi_InterfacePrepare(void *RASPI)
 }
 
 uint8_t RA8876_spi_InterfaceSendBytes(void *RASPI, uint8_t addr,
-					const uint8_t *buf_ptr,	uint32_t buf_len)
+						uint8_t *buf_ptr, uint16_t buf_len)
 {
-	uint32_t byteCnt;
+	uint16_t byteCnt;
 	
 	if (addr != 0)	RA8876_spi_send(addr);
 	
 	for(byteCnt = 0; byteCnt < buf_len; byteCnt++)
 	{
-		RA8876_spi_send(buf_ptr[byteCnt]);
+		RA8876_spi_transfer(buf_ptr[byteCnt]);
 	}
 	
 	return 0;
 }
 
 uint8_t RA8876_spi_InterfaceTransceiveBytes(void *RASPI, uint8_t addr,
-						uint8_t *buf_ptr, uint32_t buf_len)
+						uint8_t *buf_ptr, uint16_t buf_len)
 {
-	uint32_t byteCnt;
+	uint16_t byteCnt;
 	
 	if (addr != 0)	RA8876_spi_send(addr);
 	
@@ -1505,15 +1505,15 @@ uint8_t RA8876_spi_InterfaceTransceiveBytes(void *RASPI, uint8_t addr,
 }
 
 uint8_t RA8876_spi_InterfaceGetBytes(void *RASPI, uint8_t addr,
-						uint8_t *buf_ptr, uint32_t buf_len)
+						uint8_t *buf_ptr, uint16_t buf_len)
 {
-	uint32_t byteCnt;
+	uint16_t byteCnt;
 	
 	if (addr != 0)	RA8876_spi_send(addr);
 	
 	for(byteCnt = 0; byteCnt < buf_len; byteCnt++)
 	{
-		buf_ptr[byteCnt] = RA8876_spi_get();
+		buf_ptr[byteCnt] = RA8876_spi_transfer(0);
 	}
 	
 	return 0;

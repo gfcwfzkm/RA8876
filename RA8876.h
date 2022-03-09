@@ -8,7 +8,7 @@
  * Version 0.8
  * - Mostly feature-complete
  * Created: 17.11.2020
- *  Author: gfcwfzkm
+ *  Author: Pascal Gesell
  */ 
 
 #ifndef RA8876_H_
@@ -19,7 +19,7 @@
 #include <inttypes.h>
 #include "RA8876_reg.h"
 
-#include "../io_map.h"
+#include "../../io_map.h"
 
 
 /* USER CONFIG FROM HERE */
@@ -495,17 +495,17 @@ void RA8876_spi_send(uint8_t data);
 uint8_t RA8876_spi_transfer(uint8_t data);
 uint8_t RA8876_spi_get(void);
 void RA8876_spi_DMA_flashAddress(uint32_t _addr);
-void RA8876_spi_DMA_DestCoords(uint16_t x0, uint16_t y0);
+void RA8876_spi_DMA_Dest_Coords(uint16_t x0, uint16_t y0);
 void RA8876_spi_DMA_WindowSize(uint16_t width, uint16_t height);
 void RA8876_spi_DMA_SrcWidth(uint16_t width);
 // - SPI DRIVER INTERFACE FUNCTION FOR EXTERNAL LIBRARIES -
 uint8_t RA8876_spi_InterfacePrepare(void *RASPI);
 uint8_t RA8876_spi_InterfaceSendBytes(void *RASPI, uint8_t addr,
-									const uint8_t *buf_ptr, uint32_t buf_len);
+									uint8_t *buf_ptr, uint16_t buf_len);
 uint8_t RA8876_spi_InterfaceTransceiveBytes(void *RASPI, uint8_t addr,
-									uint8_t *buf_ptr, uint32_t buf_len);
+									uint8_t *buf_ptr, uint16_t buf_len);
 uint8_t RA8876_spi_InterfaceGetBytes(void *RASPI, uint8_t addr,
-									uint8_t *buf_ptr, uint32_t buf_len);
+									uint8_t *buf_ptr, uint16_t buf_len);
 uint8_t RA8876_spi_InterfaceFinish(void *RASPI);
 //-------------- I2C-Master -------------------------------------------------------------
 void RA8876_i2c_clockDiv(uint16_t _clkdiv);
