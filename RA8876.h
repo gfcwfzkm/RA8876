@@ -8,7 +8,7 @@
  * Version 0.8
  * - Mostly feature-complete
  * Created: 17.11.2020
- *  Author: Pascal Gesell
+ *  Author: gfcwfzkm
  */ 
 
 #ifndef RA8876_H_

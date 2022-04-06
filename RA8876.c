@@ -2,7 +2,7 @@
  * RA8876.c
  * Version 1.0
  * Created: 12.11.2019 15:12:02
- *  Author: Pascal Gesell
+ *  Author: gfcwfzkm
  */ 
 
 #include "RA8876.h"
