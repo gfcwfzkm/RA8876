@@ -476,6 +476,7 @@ void RA8876_BTE_WindowSize(uint16_t width, uint16_t height);
 void RA8876_BTE_AlphaBlending(uint8_t _opaque);
 void RA8876_BTE_enable(void);
 void RA8876_BTE_disable(void);
+void RA8876_BTE_RawDataUpload(uint32_t layer, uint16_t x0, uint16_t y0, uint16_t width, uint16_t height, enum RA8876_BTE_S0_color bits_per_pixel);
 //-------------- Serial Flash / SPI-Master ----------------------------------------------
 void RA8876_spi_selectFlash(uint8_t _0_or_1); // 0 is usually Font Rom, 1 is SPI Flash
 void RA8876_spi_DMA_mode(void);

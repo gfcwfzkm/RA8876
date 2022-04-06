@@ -1283,6 +1283,25 @@ void RA8876_BTE_disable(void)
 	RA8876_writeReg(RA8876_BTE_CTRL0, 0);
 }
 
+void RA8876_BTE_RawDataUpload(uint32_t layer, uint16_t x0, uint16_t y0, uint16_t width, uint16_t height, enum RA8876_BTE_S0_color bits_per_pixel)
+{
+	while(RA8876_readStatus() & RA8876_CORE_BUSY);
+	RA8876_setMode(GRAPHMODE);
+	
+	RA8876_BTE_Colors(bits_per_pixel, BTE_S1_Color_16bpp, BTE_Dest_Color_16bpp);
+	RA8876_BTE_S0_Address(layer);
+	RA8876_BTE_S0_Coords(x0,y0);
+	RA8876_BTE_S0_Width(RA8876_WIDTH);
+	RA8876_BTE_Dest_Address(layer);
+	RA8876_BTE_Dest_Coords(x0,y0);
+	RA8876_BTE_Dest_Width(RA8876_WIDTH);
+	RA8876_BTE_WindowSize(width, height);
+	RA8876_BTE_ROP_Code(BTE_MPU_WRITE_w_ROP, ROP_S0);
+	RA8876_BTE_enable();
+	
+	RA8876_writeCMD(RA8876_MRWDP);
+}
+
 //-------------- Serial Flash / SPI-Master ----------------------------------------------
 
 void _RA8876_accessMode(uint8_t _mode)
